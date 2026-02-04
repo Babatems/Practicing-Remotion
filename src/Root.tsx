@@ -2,6 +2,7 @@ import "./index.css";
 import { Composition } from "remotion";
 import { HelloWorld, myCompSchema } from "./HelloWorld";
 import { Logo, myCompSchema2 } from "./HelloWorld/Logo";
+import { BlockTraceAnimation, blockTraceSchema } from "./BlockTrace/BlockTraceAnimation";
 
 // Each <Composition> is an entry in the sidebar!
 
@@ -40,6 +41,22 @@ export const RemotionRoot: React.FC = () => {
         defaultProps={{
           logoColor1: "#91dAE2" as const,
           logoColor2: "#86A8E7" as const,
+        }}
+      />
+
+      {/* BlockTrace Logo Formation Animation */}
+      <Composition
+        id="BlockTrace"
+        component={BlockTraceAnimation}
+        durationInFrames={210}
+        fps={30}
+        width={1920}
+        height={1080}
+        schema={blockTraceSchema}
+        defaultProps={{
+          primaryColor: "#00D9FF",
+          secondaryColor: "#0057FF",
+          accentColor: "#00FF88",
         }}
       />
     </>
