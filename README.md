@@ -9,7 +9,7 @@
   </a>
 </p>
 
-Welcome to your Remotion project!
+Welcome to my Remotion project!
 
 ## Commands
 
