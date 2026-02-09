@@ -1,4 +1,9 @@
-import { AbsoluteFill, useCurrentFrame, useVideoConfig, random } from "remotion";
+import {
+  AbsoluteFill,
+  useCurrentFrame,
+  useVideoConfig,
+  random,
+} from "remotion";
 import { useMemo } from "react";
 
 interface Particle {
@@ -8,6 +13,8 @@ interface Particle {
   size: number;
   duration: number;
   startDelay: number;
+  colorPhase: number; // 0 = accent, 1 = primary
+  rotationSpeed?: number;
 }
 
 const generateParticles = (count: number): Particle[] => {
@@ -15,11 +22,13 @@ const generateParticles = (count: number): Particle[] => {
   for (let i = 0; i < count; i++) {
     particles.push({
       id: i,
-      angle: (Math.PI * 2 * i) / count + (random(i) - 0.5) * 0.5,
-      speed: 3 + random(i + 100) * 4,
-      size: 2 + random(i + 200) * 6,
-      duration: 30 + random(i + 300) * 20,
-      startDelay: random(i + 400) * 10,
+      angle: (Math.PI * 2 * i) / count + (random(i) - 0.5) * 0.8,
+      speed: 2.5 + random(i + 100) * 5,
+      size: 1.5 + random(i + 200) * 8,
+      duration: 35 + random(i + 300) * 25,
+      startDelay: random(i + 400) * 8,
+      colorPhase: random(i + 500),
+      rotationSpeed: -0.15 + random(i + 600) * 0.3,
     });
   }
   return particles;
@@ -34,31 +43,51 @@ const Particle: React.FC<{
   intensity: number;
 }> = ({ particle, frame, primaryColor, accentColor, intensity }) => {
   const particleFrame = frame - particle.startDelay;
-  
+
   if (particleFrame < 0 || particleFrame > particle.duration) {
     return null;
   }
 
   const progress = particleFrame / particle.duration;
-  const distance = particle.speed * particleFrame * (intensity + 0.5);
-  
+  const easeOutQuad = (t: number) => 1 - (1 - t) * (1 - t);
+  const easedProgress = easeOutQuad(progress);
+  const distance = particle.speed * particleFrame * (1 + intensity * 0.3);
+
   const x = 960 + Math.cos(particle.angle) * distance;
   const y = 540 + Math.sin(particle.angle) * distance;
-  
-  const opacity = Math.max(0, 1 - progress * progress);
-  const size = particle.size * (1 + progress * 0.5);
+
+  // Smooth opacity with ease out quad
+  const opacity = Math.max(0, (1 - easedProgress) * (1 - easedProgress));
+  const size = particle.size * (1 + easedProgress * 0.8);
+
+  // Color transition from accent to primary
+  const color = particle.colorPhase < 0.5 ? accentColor : primaryColor;
 
   return (
-    <circle
-      cx={x}
-      cy={y}
-      r={size}
-      fill={progress < 0.5 ? accentColor : primaryColor}
-      opacity={opacity * intensity}
-      style={{
-        filter: `drop-shadow(0 0 ${4 + progress * 4}px ${primaryColor})`,
-      }}
-    />
+    <g key={particle.id}>
+      {/* Glow halo */}
+      <circle
+        cx={x}
+        cy={y}
+        r={size * 1.5}
+        fill={color}
+        opacity={opacity * 0.3 * intensity}
+        style={{
+          filter: `drop-shadow(0 0 ${6 + easedProgress * 8}px ${color})`,
+        }}
+      />
+      {/* Main particle */}
+      <circle
+        cx={x}
+        cy={y}
+        r={size}
+        fill={color}
+        opacity={opacity * intensity}
+        style={{
+          filter: `drop-shadow(0 0 ${4 + easedProgress * 6}px ${color})`,
+        }}
+      />
+    </g>
   );
 };
 
@@ -71,21 +100,25 @@ export const EnergyBurst: React.FC<{
   const { width, height, fps } = useVideoConfig();
 
   // Generate particles once
-  const particles = useMemo(() => generateParticles(40), []);
+  const particles = useMemo(() => generateParticles(55), []);
 
-  // Electric pulse rings
-  const pulseCount = 4;
+  // Electric pulse rings with staggered timing
+  const pulseCount = 5;
   const pulses = useMemo(() => {
     const result = [];
     for (let i = 0; i < pulseCount; i++) {
       result.push({
         id: i,
-        delay: i * 4,
-        maxRadius: 150 + i * 60,
+        delay: i * 3,
+        maxRadius: 120 + i * 70,
+        thickness: 3 - i * 0.4,
       });
     }
     return result;
   }, []);
+
+  // Chromatic aberration offset (subtle for professional feel)
+  const chromaticOffset = intensity * 2;
 
   return (
     <AbsoluteFill
@@ -107,97 +140,216 @@ export const EnergyBurst: React.FC<{
         }}
       >
         <defs>
-          {/* Radial gradient for center glow */}
+          {/* Radial gradient for center core glow */}
           <radialGradient id="energy-glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={accentColor} stopOpacity={intensity} />
-            <stop offset="50%" stopColor={primaryColor} stopOpacity={intensity * 0.6} />
+            <stop
+              offset="0%"
+              stopColor={accentColor}
+              stopOpacity={intensity * 0.8}
+            />
+            <stop
+              offset="35%"
+              stopColor={primaryColor}
+              stopOpacity={intensity * 0.5}
+            />
+            <stop
+              offset="70%"
+              stopColor={primaryColor}
+              stopOpacity={intensity * 0.2}
+            />
             <stop offset="100%" stopColor={primaryColor} stopOpacity={0} />
           </radialGradient>
 
-          {/* Filter for electric effect */}
+          {/* Secondary glow for energy waves */}
+          <radialGradient id="secondary-glow" cx="50%" cy="50%" r="60%">
+            <stop offset="0%" stopColor={primaryColor} stopOpacity={0} />
+            <stop
+              offset="50%"
+              stopColor={primaryColor}
+              stopOpacity={intensity * 0.3}
+            />
+            <stop offset="100%" stopColor={primaryColor} stopOpacity={0} />
+          </radialGradient>
+
+          {/* Filter for electric turbulent effect */}
           <filter id="electric-effect">
             <feTurbulence
               type="fractalNoise"
-              baseFrequency="0.8"
-              numOctaves="3"
+              baseFrequency="0.85"
+              numOctaves="4"
               result="noise"
+              seed={Math.floor(frame / 5) % 100}
             />
             <feDisplacementMap
               in="SourceGraphic"
               in2="noise"
-              scale={3 * intensity}
+              scale={2.5 * intensity}
               xChannelSelector="R"
               yChannelSelector="G"
             />
           </filter>
+
+          {/* Chromatic aberration filter for professional digital feel */}
+          <filter id="chromatic-aberration">
+            <feOffset dx={chromaticOffset} dy={0} result="offsetRed" />
+            <feOffset
+              dx={-chromaticOffset * 0.5}
+              dy={chromaticOffset * 0.5}
+              result="offsetGreen"
+            />
+            <feOffset
+              dx={-chromaticOffset * 0.5}
+              dy={-chromaticOffset * 0.5}
+              result="offsetBlue"
+            />
+            <feComponentTransfer result="separated">
+              <feFuncR
+                type="discrete"
+                tableValues="1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+              />
+              <feFuncG
+                type="discrete"
+                tableValues="0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0"
+              />
+              <feFuncB
+                type="discrete"
+                tableValues="0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0"
+              />
+            </feComponentTransfer>
+          </filter>
+
+          {/* Glow blur filter */}
+          <filter id="blur-glow">
+            <feGaussianBlur stdDeviation={4 * intensity} result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
 
-        {/* Central glow burst */}
+        {/* Central core burst - bright and intense */}
         <circle
           cx={960}
           cy={540}
-          r={200}
+          r={240 * intensity}
           fill="url(#energy-glow)"
-          opacity={intensity}
+          opacity={intensity * 0.9}
+          style={{
+            filter: "url(#blur-glow)",
+          }}
         />
 
-        {/* Electric pulse rings */}
+        {/* Secondary pulsing ring for depth */}
+        <circle
+          cx={960}
+          cy={540}
+          r={280 * intensity}
+          fill="url(#secondary-glow)"
+          opacity={intensity * 0.5}
+        />
+
+        {/* Electric pulse rings with varying opacity */}
         {pulses.map((pulse) => {
           const ringFrame = Math.max(0, frame - pulse.delay);
-          const ringProgress = Math.min(1, ringFrame / 20);
-          const radius = pulse.maxRadius * ringProgress;
-          const ringOpacity = Math.max(0, 1 - ringProgress) * intensity;
+          const ringProgress = Math.min(1, ringFrame / 22);
+          const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+          const easedProgress = easeOutCubic(ringProgress);
+          const radius = pulse.maxRadius * easedProgress;
+          const ringOpacity =
+            Math.max(0, (1 - ringProgress) * (1 - ringProgress)) *
+            intensity *
+            0.7;
 
           return (
-            <circle
-              key={pulse.id}
-              cx={960}
-              cy={540}
-              r={radius}
-              fill="none"
-              stroke={primaryColor}
-              strokeWidth={2}
-              opacity={ringOpacity}
-              style={{
-                filter: "url(#electric-effect)",
-              }}
-            />
-          );
-        })}
-
-        {/* Circuit patterns - horizontal and vertical lines */}
-        {[1, 2, 3].map((idx) => {
-          const lineOpacity = Math.max(0, 1 - frame * 0.02) * intensity;
-          const yOffset = 540 + (idx - 2) * 60;
-          const xOffset = 960 + (idx - 2) * 80;
-
-          return (
-            <g key={`circuits-${idx}`} opacity={lineOpacity}>
-              {/* Horizontal lines */}
-              <line
-                x1={500}
-                y1={yOffset}
-                x2={1420}
-                y2={yOffset}
+            <g key={`pulse-${pulse.id}`}>
+              {/* Main ring */}
+              <circle
+                cx={960}
+                cy={540}
+                r={radius}
+                fill="none"
                 stroke={primaryColor}
-                strokeWidth={2}
-                strokeDasharray="20,10"
+                strokeWidth={pulse.thickness}
+                opacity={ringOpacity}
+                style={{
+                  filter: "url(#electric-effect)",
+                }}
               />
-              {/* Vertical lines */}
-              <line
-                x1={xOffset}
-                y1={200}
-                x2={xOffset}
-                y2={880}
-                stroke={primaryColor}
-                strokeWidth={2}
-                strokeDasharray="20,10"
+
+              {/* Glow version of ring */}
+              <circle
+                cx={960}
+                cy={540}
+                r={radius}
+                fill="none"
+                stroke={accentColor}
+                strokeWidth={pulse.thickness * 2}
+                opacity={ringOpacity * 0.4}
+                style={{
+                  filter: `drop-shadow(0 0 ${12 * intensity}px ${primaryColor})`,
+                }}
               />
             </g>
           );
         })}
 
-        {/* Particles */}
+        {/* Circuit patterns - enhanced with more detail */}
+        {[1, 2, 3, 4].map((idx) => {
+          const patternOpacity =
+            Math.max(0, 1 - frame * 0.015) * intensity * 0.6;
+          const yOffset = 540 + (idx - 2.5) * 75;
+          const xOffset = 960 + (idx - 2.5) * 95;
+
+          return (
+            <g key={`circuits-${idx}`} opacity={patternOpacity}>
+              {/* Horizontal dashed line */}
+              <line
+                x1={450}
+                y1={yOffset}
+                x2={1470}
+                y2={yOffset}
+                stroke={primaryColor}
+                strokeWidth={2.5}
+                strokeDasharray="25,12"
+                style={{
+                  filter: `drop-shadow(0 0 6px ${primaryColor})`,
+                }}
+              />
+
+              {/* Vertical dashed line */}
+              <line
+                x1={xOffset}
+                y1={180}
+                x2={xOffset}
+                y2={900}
+                stroke={primaryColor}
+                strokeWidth={2.5}
+                strokeDasharray="25,12"
+                style={{
+                  filter: `drop-shadow(0 0 6px ${primaryColor})`,
+                }}
+              />
+
+              {/* Diagonal accent line for complexity */}
+              <line
+                x1={xOffset - 50}
+                y1={yOffset - 50}
+                x2={xOffset + 50}
+                y2={yOffset + 50}
+                stroke={accentColor}
+                strokeWidth={1.5}
+                opacity={patternOpacity * 0.6}
+                strokeDasharray="20,10"
+                style={{
+                  filter: `drop-shadow(0 0 4px ${accentColor})`,
+                }}
+              />
+            </g>
+          );
+        })}
+
+        {/* Particles burst */}
         {particles.map((particle) => (
           <Particle
             key={particle.id}

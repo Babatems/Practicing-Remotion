@@ -6,6 +6,7 @@ interface LineConfig {
   endX: number;
   endY: number;
   delay: number;
+  index: number;
 }
 
 const lineConfigs: LineConfig[] = [
@@ -16,6 +17,7 @@ const lineConfigs: LineConfig[] = [
     endX: 960,
     endY: 540,
     delay: 0,
+    index: 0,
   },
   // Top-right
   {
@@ -23,7 +25,8 @@ const lineConfigs: LineConfig[] = [
     startY: 100,
     endX: 960,
     endY: 540,
-    delay: 0.1,
+    delay: 0.08,
+    index: 1,
   },
   // Bottom-left
   {
@@ -31,7 +34,8 @@ const lineConfigs: LineConfig[] = [
     startY: 980,
     endX: 960,
     endY: 540,
-    delay: 0.2,
+    delay: 0.16,
+    index: 2,
   },
   // Bottom-right
   {
@@ -39,7 +43,8 @@ const lineConfigs: LineConfig[] = [
     startY: 980,
     endX: 960,
     endY: 540,
-    delay: 0.3,
+    delay: 0.24,
+    index: 3,
   },
   // Center-top
   {
@@ -47,9 +52,13 @@ const lineConfigs: LineConfig[] = [
     startY: 50,
     endX: 960,
     endY: 540,
-    delay: 0.15,
+    delay: 0.12,
+    index: 4,
   },
 ];
+
+// Professional easing function for smooth motion graphics
+const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
 const GlowingNode: React.FC<{
   x: number;
@@ -57,30 +66,46 @@ const GlowingNode: React.FC<{
   primaryColor: string;
   accentColor: string;
   opacity: number;
-}> = ({ x, y, primaryColor, accentColor, opacity }) => {
+  size?: number;
+}> = ({ x, y, primaryColor, accentColor, opacity, size = 1 }) => {
   return (
     <g opacity={opacity}>
-      {/* Outer glow */}
+      {/* Outer glow ring - larger for premium feel */}
       <circle
         cx={x}
         cy={y}
-        r={20}
-        fill={primaryColor}
-        opacity={0.3}
+        r={24 * size}
+        fill="none"
+        stroke={primaryColor}
+        strokeWidth={1.5}
+        opacity={0.25}
         style={{
-          filter: `drop-shadow(0 0 15px ${primaryColor})`,
+          filter: `drop-shadow(0 0 16px ${primaryColor})`,
+        }}
+      />
+      {/* Mid glow */}
+      <circle
+        cx={x}
+        cy={y}
+        r={18 * size}
+        fill={primaryColor}
+        opacity={0.15}
+        style={{
+          filter: `drop-shadow(0 0 12px ${primaryColor})`,
         }}
       />
       {/* Inner core */}
       <circle
         cx={x}
         cy={y}
-        r={12}
+        r={10 * size}
         fill={accentColor}
         style={{
-          filter: `drop-shadow(0 0 8px ${accentColor})`,
+          filter: `drop-shadow(0 0 10px ${accentColor})`,
         }}
       />
+      {/* Center dot for depth */}
+      <circle cx={x} cy={y} r={4 * size} fill={primaryColor} opacity={0.8} />
     </g>
   );
 };
@@ -92,78 +117,139 @@ const ConnectionLine: React.FC<{
   secondaryColor: string;
   accentColor: string;
 }> = ({ config, progress, primaryColor, secondaryColor, accentColor }) => {
-  // Delay the start of this line's animation
-  const delayedProgress = Math.max(0, progress - config.delay) / (1 - config.delay);
-  
-  // Apply professional cubic ease-out for smooth motion graphics
-  const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+  // Staggered delay for cascading effect
+  const delayedProgress =
+    Math.max(0, progress - config.delay) / (1 - config.delay);
+
+  // Professional cubic ease-out for smooth, controlled motion
   const lineProgress = Math.min(1, easeOutCubic(delayedProgress));
 
-  // Calculate current positions
+  // Calculate current positions with precision
   const currentX = config.startX + (config.endX - config.startX) * lineProgress;
   const currentY = config.startY + (config.endY - config.startY) * lineProgress;
 
-  // Node position (trails the line)
-  const nodeTrailDistance = 0.15;
+  // Node position (trails the line for dynamic effect)
+  const nodeTrailDistance = 0.12;
   const nodeProgress = Math.max(0, lineProgress - nodeTrailDistance);
   const nodeX = config.startX + (config.endX - config.startX) * nodeProgress;
   const nodeY = config.startY + (config.endY - config.startY) * nodeProgress;
 
+  // Secondary trailing node for richness
+  const secondTrailDistance = 0.06;
+  const secondNodeProgress = Math.max(0, lineProgress - secondTrailDistance);
+  const secondNodeX =
+    config.startX + (config.endX - config.startX) * secondNodeProgress;
+  const secondNodeY =
+    config.startY + (config.endY - config.startY) * secondNodeProgress;
+
+  const gradientId = `line-gradient-${config.index}`;
+  const lineOpacity = Math.min(1, lineProgress * 1.2); // Slightly over-bright for energy
+
   return (
     <g>
-      {/* Connection line with gradient */}
+      {/* Define gradients dynamically */}
       {lineProgress > 0 && (
         <defs>
           <linearGradient
-            id={`line-gradient-${config.delay}`}
+            id={gradientId}
             x1={config.startX}
             y1={config.startY}
             x2={currentX}
             y2={currentY}
           >
             <stop offset="0%" stopColor={primaryColor} stopOpacity={0} />
-            <stop offset="50%" stopColor={primaryColor} stopOpacity={0.6} />
+            <stop offset="30%" stopColor={primaryColor} stopOpacity={0.4} />
+            <stop offset="70%" stopColor={secondaryColor} stopOpacity={0.8} />
             <stop offset="100%" stopColor={secondaryColor} stopOpacity={1} />
           </linearGradient>
         </defs>
       )}
 
-      {/* Main line */}
+      {/* Glow/shadow line underneath for depth */}
+      {lineProgress > 0.05 && (
+        <line
+          x1={config.startX}
+          y1={config.startY}
+          x2={currentX}
+          y2={currentY}
+          stroke={primaryColor}
+          strokeWidth={8}
+          strokeLinecap="round"
+          opacity={lineOpacity * 0.15}
+          style={{
+            filter: `blur(4px)`,
+          }}
+        />
+      )}
+
+      {/* Main line with gradient */}
       {lineProgress > 0 && (
         <line
           x1={config.startX}
           y1={config.startY}
           x2={currentX}
           y2={currentY}
-          stroke={`url(#line-gradient-${config.delay})`}
-          strokeWidth={4}
+          stroke={`url(#${gradientId})`}
+          strokeWidth={5}
           strokeLinecap="round"
-          opacity={lineProgress}
+          strokeLinejoin="round"
+          opacity={lineOpacity}
           style={{
-            filter: `drop-shadow(0 0 10px ${primaryColor})`,
+            filter: `drop-shadow(0 0 12px ${primaryColor})`,
           }}
         />
       )}
 
-      {/* Glowing node at the front */}
-      {lineProgress > 0 && (
+      {/* Secondary trailing glow line */}
+      {secondNodeProgress > 0.05 && (
+        <line
+          x1={config.startX}
+          y1={config.startY}
+          x2={secondNodeX}
+          y2={secondNodeY}
+          stroke={primaryColor}
+          strokeWidth={3}
+          strokeLinecap="round"
+          opacity={Math.max(0, 1 - secondNodeProgress) * 0.4 * lineProgress}
+          style={{
+            filter: `drop-shadow(0 0 6px ${primaryColor})`,
+          }}
+        />
+      )}
+
+      {/* Leading glowing node */}
+      {lineProgress > 0.05 && (
         <GlowingNode
           x={currentX}
           y={currentY}
           primaryColor={primaryColor}
           accentColor={accentColor}
           opacity={lineProgress}
+          size={1}
         />
       )}
 
-      {/* Trailing node */}
-      {nodeProgress > 0 && nodeProgress < 1 && (
+      {/* Mid-trail node for depth */}
+      {secondNodeProgress > 0.05 && secondNodeProgress < 0.95 && (
+        <GlowingNode
+          x={secondNodeX}
+          y={secondNodeY}
+          primaryColor={primaryColor}
+          accentColor={accentColor}
+          opacity={Math.max(0, (1 - secondNodeProgress) * 0.6) * lineProgress}
+          size={0.7}
+        />
+      )}
+
+      {/* Distant trailing node for motion trail */}
+      {nodeProgress > 0.1 && nodeProgress < 0.9 && (
         <GlowingNode
           x={nodeX}
           y={nodeY}
           primaryColor={primaryColor}
           accentColor={accentColor}
-          opacity={Math.max(0, 1 - nodeProgress) * 0.5}
+          opacity={Math.max(0, (1 - nodeProgress) * 0.3) * lineProgress}
+          size={0.5}
         />
       )}
     </g>
